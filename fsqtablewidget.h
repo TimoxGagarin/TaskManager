@@ -30,6 +30,8 @@ public:
 
     void addItem(Model* model) override;
     Model* getItem(int row) override;
+
+    void mouseDoubleClickEvent(QMouseEvent *event) override;
 };
 
 #endif // FSQTABLEWIDGET_H

@@ -12,6 +12,7 @@
 #include <QLabel>
 #include <QPushButton>
 #include <QAction>
+#include <qlineedit.h>
 
 #include <pthread.h>
 #include <unistd.h>
@@ -20,24 +21,49 @@ MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
 {
+    // Подготовка рабочего потока
+    workerThread = new QThread();
+    worker = new Worker();
+    worker->moveToThread(workerThread);
+
+    connect(workerThread, &QThread::started, worker, &Worker::timer_updateTables);
+    connect(worker, &Worker::process_updated, this, &MainWindow::updateProcesses);
+    connect(worker, &Worker::fileSystems_updated, this, &MainWindow::updateFileSystems);
+
+    /// Загрузка интерфейса
+    // Страница "Процессы"
     ui->setupUi(this);
     ui->tabWidget->setStyleSheet("QTabWidget::tab-bar {alignment: center;}");
+    QLineEdit *searchLineEdit = new QLineEdit();
+    QStringList headers = QStringList() << "Name" << "PID" << "PPID" << "CMD" << "State";
+    processTableWidget = new ProcQTableWidget(0, headers.size(), headers, {}, this);
 
-    processTableWidget = new ProcQTableWidget(0, 4, QStringList() << "Name" << "PID" << "PPID" << "State", {}, this);
-    ui->tabWidget->insertTab(0, processTableWidget, "Процессы");
+    QWidget *tableWidget = new QWidget();
+    QVBoxLayout layout(tableWidget);
+    layout.addWidget(searchLineEdit);
+    layout.addWidget(processTableWidget);
+    ui->tabWidget->insertTab(0, tableWidget, "Процессы");
 
+    connect(searchLineEdit, &QLineEdit::textChanged, [&](QString str){processTableWidget->filterTable(str);});
+
+    // Страница "Файловые системы"
     fileSystemsTableWidget = new FSQTableWidget(0, 7, QStringList() << "Name" << "Mounted" << "Type" << "Total" << "Free" << "Available" << "Used", {}, this);
     ui->tabWidget->insertTab(1, fileSystemsTableWidget, "Файловые системы");
+}
+
+void MainWindow::showEvent(QShowEvent *event){
+    workerThread->start();
+    QMainWindow::showEvent(event);
 }
 
 void MainWindow::resizeEvent(QResizeEvent *event){
     QMainWindow::resizeEvent(event);
     ui->tabWidget->setMinimumSize(this->width(), this->height());
+    processTableWidget->setMinimumSize(this->width(), this->height());
 }
 
 void MainWindow::closeEvent(QCloseEvent *event){
-//    workerThread.quit();
-//    workerThread.wait();
+    worker->stop();
     QMainWindow::closeEvent(event);
 }
 
@@ -46,6 +72,7 @@ MainWindow::~MainWindow() {
 }
 
 void MainWindow::updateProcesses(QList<ProcInfo> list){
+    processTableWidget->setSortingEnabled(false);
     processTableWidget->setUpdatesEnabled(false);
     this->processTableWidget->clearContents();
     this->processTableWidget->setRowCount(0);
@@ -53,10 +80,13 @@ void MainWindow::updateProcesses(QList<ProcInfo> list){
     for(auto el: list){
         this->processTableWidget->addItem(&el);
     }
+    this->processTableWidget->filterTable(ui->tabWidget->widget(0)->findChild<QLineEdit*>()->text());
     processTableWidget->setUpdatesEnabled(true);
+    processTableWidget->setSortingEnabled(true);
 }
 
 void MainWindow::updateFileSystems(QList<FileSystem> list){
+    fileSystemsTableWidget->setSortingEnabled(false);
     this->fileSystemsTableWidget->setUpdatesEnabled(false);
 
     this->fileSystemsTableWidget->clearContents();
@@ -65,4 +95,5 @@ void MainWindow::updateFileSystems(QList<FileSystem> list){
         this->fileSystemsTableWidget->addItem(&el);
     }
     this->fileSystemsTableWidget->setUpdatesEnabled(true);
+    fileSystemsTableWidget->setSortingEnabled(true);
 }

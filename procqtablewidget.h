@@ -18,6 +18,7 @@ protected:
         name,
         pid,
         ppid,
+        cmd,
         state,
     };
 public:
@@ -28,6 +29,7 @@ public:
     };
     void addItem(Model* model) override;
     void showContextMenu(const QPoint &pos);
+    void filterTable(QString str);
     Model* getItem(int row) override;
 };
 

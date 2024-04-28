@@ -5,6 +5,7 @@
 #include <QDirIterator>
 #include <qlist.h>
 #include <qstringlist.h>
+#include <qthread.h>
 
 #include <sys/statvfs.h>
 #include <mntent.h>
@@ -24,11 +25,16 @@ QList<ProcInfo> Worker::get_processes() {
     dir.setFilter(QDir::Dirs | QDir::NoDotAndDotDot);
     QFileInfoList proc_list = dir.entryInfoList();
     for (QFileInfo subdir: proc_list) {
-        pid_t pid = subdir.baseName().toInt();
+        bool ok;
+        pid_t pid = subdir.baseName().toInt(&ok);
+        if(!ok)
+            continue;
+        QMap<QString, QString> processInfo;
+
+        // Основная информация о процессе
         QString proc_path = QString("/proc/%1/status").arg(pid);
         QFile file(proc_path);
         if (file.open(QIODevice::ReadOnly)) {
-            QMap<QString, QString> processInfo;
             QTextStream stream(&file);
             while (true) {
                 QString line = stream.readLine().replace("\t", " ").trimmed();
@@ -41,9 +47,20 @@ QList<ProcInfo> Worker::get_processes() {
                     processInfo.insert(key, value);
                 }
             }
-            ret.append(ProcInfo(processInfo));
         }
         file.close();
+
+        // Информация о командной строке
+        QString cmd_path = QString("/proc/%1/cmdline").arg(pid);
+        QFile cmdfile(cmd_path);
+        if (cmdfile.open(QIODevice::ReadOnly)) {
+            QTextStream stream(&cmdfile);
+            QString line = stream.readLine();
+            processInfo.insert("cmd", line);
+        }
+        cmdfile.close();
+        // qDebug() << processInfo;
+        ret.append(ProcInfo(processInfo));
     }
     return ret;
 }
@@ -87,9 +104,13 @@ QList<FileSystem> Worker::get_fileSystems(){
 }
 
 void Worker::timer_updateTables() {
-    while(true){
+    while(!stopFlag.load()){
         emit process_updated(get_processes());
         emit fileSystems_updated(get_fileSystems());
-        sleep(3);
+        QThread::sleep(5);
     }
+}
+
+void Worker::stop(){
+    stopFlag.store(true);
 }

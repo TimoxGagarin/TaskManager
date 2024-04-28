@@ -5,24 +5,9 @@
 #include <qprogressbar.h>
 #include <QHBoxLayout>
 #include <qlabel.h>
-
-QString size_human(long long in_num)
-{
-    float num = (float)in_num;
-    QStringList list;
-    list << "KB" << "MB" << "GB" << "TB";
-
-    QStringListIterator i(list);
-    QString unit("bytes");
-
-    while(num >= 1024.0 && i.hasNext())
-     {
-        unit = i.next();
-        num /= 1024.0;
-    }
-    return QString().setNum(num,'f',2)+" "+unit;
-}
-
+#include <QDesktopServices>
+#include <QUrl>
+#include <math.h>
 
 void FSQTableWidget::addItem(Model* model)
 {
@@ -32,16 +17,16 @@ void FSQTableWidget::addItem(Model* model)
     addCol(columns::name, rows, fileSystem->getName());
     addCol(columns::mount_dir, rows, fileSystem->getMountDir());
     addCol(columns::type, rows, fileSystem->getType());
-    addCol(columns::total, rows, size_human(fileSystem->getTotal()));
-    addCol(columns::free, rows, size_human(fileSystem->getFree()));
-    addCol(columns::available, rows, size_human(fileSystem->getAvailable()));
+    addCol(columns::total, rows, InfoSize(fileSystem->getTotal()));
+    addCol(columns::free, rows, InfoSize(fileSystem->getFree()));
+    addCol(columns::available, rows, InfoSize(fileSystem->getAvailable()));
 
     QWidget *widget = new QWidget();
     QHBoxLayout *layout = new QHBoxLayout(widget);
 
     QProgressBar *progressBar = new QProgressBar();
     progressBar->setRange(0, 100);
-    progressBar->setValue((int)(100*(double)fileSystem->getUsed() / (double)fileSystem->getTotal()));
+    progressBar->setValue((int)(100*(double)fileSystem->getUsed().getBytes() / (double)fileSystem->getTotal().getBytes()));
     progressBar->setStyleSheet(
             "QProgressBar {"
             "   border: 0;"
@@ -55,7 +40,7 @@ void FSQTableWidget::addItem(Model* model)
             "   width: 20px;"  // Ширина отдельного блока заполнения
     "}");
 
-    QLabel *label = new QLabel(size_human(fileSystem->getUsed()));
+    QLabel *label = new QLabel(fileSystem->getUsed().toString());
 
     layout->addWidget(label);
     layout->addWidget(progressBar);
@@ -67,6 +52,20 @@ void FSQTableWidget::addItem(Model* model)
 
 Model* FSQTableWidget::getItem(int row){
     FileSystem* ret = new FileSystem;
-    // TODO: fill
+    ret->setName(item(row, columns::name)->text());
+    ret->setMountDir(item(row, columns::mount_dir)->text());
+    ret->setType(item(row, columns::type)->text());
+    ret->setTotal(InfoSize(item(row, columns::total)->text()));
+    ret->setFree(InfoSize(item(row, columns::free)->text()));
+    ret->setAvailable(InfoSize(item(row, columns::available)->text()));
+    ret->setUsed(InfoSize(cellWidget(row, columns::used)->findChild<QLabel*>()->text()));
     return (Model*) ret;
+}
+
+void FSQTableWidget::mouseDoubleClickEvent(QMouseEvent *event){
+    int row = currentRow();
+    QString path = ((FileSystem*)getItem(row))->getMountDir();
+    QUrl url = QUrl::fromLocalFile(path);
+    QDesktopServices::openUrl(url);
+    QTableWidget::mouseDoubleClickEvent(event);
 }

@@ -13,18 +13,20 @@ QT_END_NAMESPACE
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
-
-public:
-    MainWindow(QWidget *parent = nullptr);
-    ~MainWindow();
-    void resizeEvent(QResizeEvent *event) override;
-    void closeEvent(QCloseEvent *event) override;
-    void timer_updateTables();
-
 private:
     Ui::MainWindow *ui;
     ProcQTableWidget *processTableWidget;
     FSQTableWidget *fileSystemsTableWidget;
+
+    QThread* workerThread;
+    Worker* worker;
+public:
+    MainWindow(QWidget *parent = nullptr);
+    ~MainWindow();
+    void showEvent(QShowEvent *event) override;
+    void resizeEvent(QResizeEvent *event) override;
+    void closeEvent(QCloseEvent *event) override;
+    void timer_updateTables();
 public slots:
     void updateProcesses(QList<ProcInfo> list);
     void updateFileSystems(QList<FileSystem> list);

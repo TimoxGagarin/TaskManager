@@ -15,10 +15,11 @@ ProcInfo::~ProcInfo(){
     state.clear();
 }
 
-ProcInfo::ProcInfo(QString name, pid_t pid, pid_t ppid, QString state) : Model(name){
+ProcInfo::ProcInfo(QString name, pid_t pid, pid_t ppid, QString state, QString cmd) : Model(name){
     this->pid = pid;
     this->ppid = ppid;
     this->state = state;
+    this->cmd = cmd;
 }
 
 ProcInfo::ProcInfo(QMap<QString, QString> procInfoMap){
@@ -26,13 +27,15 @@ ProcInfo::ProcInfo(QMap<QString, QString> procInfoMap){
     this->pid = procInfoMap["Pid"].toInt();
     this->ppid = procInfoMap["Ppid"].toInt();
     this->state = procInfoMap["State"];
+    this->cmd = procInfoMap["cmd"];
 }
 
 QString ProcInfo::toString(){
     return this->name + ", " +
            QString::number(this->pid) + ", " +
            QString::number(this->ppid) + ", " +
-           this->state;
+           this->state + ", " +
+           this->cmd;
 }
 
 int ProcInfo::stopProc(){

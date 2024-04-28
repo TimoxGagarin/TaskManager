@@ -11,6 +11,7 @@ CONFIG += c++11
 SOURCES += \
     filesystem.cpp \
     fsqtablewidget.cpp \
+    infosize.cpp \
     main.cpp \
     mainwindow.cpp \
     model.cpp \
@@ -22,6 +23,7 @@ SOURCES += \
 HEADERS += \
     filesystem.h \
     fsqtablewidget.h \
+    infosize.h \
     mainwindow.h \
     model.h \
     modelqtablewidget.h \

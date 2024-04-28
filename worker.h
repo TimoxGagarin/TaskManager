@@ -10,6 +10,8 @@
 class Worker: public QObject
 {
     Q_OBJECT
+private:
+    QAtomicInt stopFlag;
 public:
     Worker();
     QList<ProcInfo> get_processes();
@@ -17,6 +19,7 @@ public:
 
 public slots:
     void timer_updateTables();
+    void stop();
 
 signals:
     void process_updated(QList<ProcInfo> list);
