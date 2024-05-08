@@ -11,6 +11,7 @@ int main(int argc, char *argv[])
 
     qRegisterMetaType<QList<ProcInfo>>("QList<ProcInfo>");
     qRegisterMetaType<QList<FileSystem>>("QList<FileSystem>");
+    qRegisterMetaType<QVector<QVector<double>>>("QVector<QVector<double>>");
 
     w.show();
     return a.exec();

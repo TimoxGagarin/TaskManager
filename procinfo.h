@@ -1,8 +1,11 @@
 #ifndef PROCINFO_H
 #define PROCINFO_H
 #include <qstring.h>
-#include "model.h"
+#include <qdatetime.h>
 
+#include "model.h"
+#include "infosize.h"
+#include "cpuusage.h"
 
 class ProcInfo: public Model
 {
@@ -11,13 +14,15 @@ protected:
     pid_t ppid;
     QString state;
     QString cmd;
-//    long long virtual_memory;
-//    long long resident_memory;
-
+    InfoSize virtual_memory;
+    InfoSize resident_memory;
+    float cpu;
+    QDateTime start_time;
+    int priority;
 public:
     ProcInfo();
     ProcInfo(QMap<QString, QString> procInfoMap);
-    ProcInfo(QString name, pid_t pid, pid_t ppid, QString state, QString cmd);//, long long virtual_memory, long long resident_memory);
+    ProcInfo(QString name, pid_t pid, pid_t ppid, QString state, QString cmd, InfoSize virtual_memory, InfoSize resident_memory, float cpu, QDateTime start_time, int priority);
     ~ProcInfo();
     QString toString() override;
 
@@ -34,11 +39,16 @@ public:
     void setState(QString state) {this->state = state;};
     QString getCmd() {return cmd;};
     void setCmd(QString cmd) {this->cmd = cmd;};
-
-//    long long getVirtualMemory() {return virtual_memory;};
-//    void setVirtualMemory(long long virtual_memory) {this->virtual_memory = virtual_memory;};
-//    pid_t getPid() {return pid;};
-//    void setPid(pid_t pid) {this->pid = pid;};
+    InfoSize getVirtualMemory() {return virtual_memory;};
+    void setVirtualMemory(InfoSize virtual_memory) {this->virtual_memory = virtual_memory;};
+    InfoSize getResidentMemory() {return resident_memory;};
+    void setResidentMemory(InfoSize resident_memory) {this->resident_memory = resident_memory;};
+    float getCPU() {return cpu;};
+    void setCPU(float cpu) {this->cpu = cpu;};
+    QDateTime getStartTime() {return start_time;};
+    void setStartTime(QDateTime start_time) {this->start_time = start_time;};
+    int getPriority() {return priority;};
+    void setPriority(int priority) {this->priority = priority;};
 };
 
 #endif // PROCINFO_H

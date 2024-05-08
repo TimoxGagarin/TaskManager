@@ -12,9 +12,19 @@ InfoSize::InfoSize(long long bytes){
 }
 
 InfoSize::InfoSize(QString str){
+    units_list = QStringList() << "B" << "KB" << "MB" << "GB" << "TB";
+
+    if(str == "Н/Д"){
+        num = 0;
+        unit = units_list[0];
+        bytes = 0;
+        error = "Н/Д";
+        return;
+    }
     num = str.split(' ')[0].toDouble();
-    unit = str.split(' ')[1];
-    bytes = (long long)num * pow(1024.0f, units_list.indexOf(unit));
+    unit = str.split(' ')[1].toUpper();
+    bytes = (long long)(num * pow(1024.0f, units_list.indexOf(unit)));
+    setBytes(this->bytes);
 }
 
 void InfoSize::setBytes(long long bytes){
@@ -27,29 +37,7 @@ void InfoSize::setBytes(long long bytes){
 }
 
 QString InfoSize::toString(){
-    return (QString::number(num, 'g', 4) + " " + unit);
-}
-
-bool InfoSize::operator==(const InfoSize& other) const{
-    return bytes == other.bytes;
-}
-
-bool InfoSize::operator!=(const InfoSize& other) const{
-    return bytes != other.bytes;
-}
-
-bool InfoSize::operator<(const InfoSize& other) const{
-    return bytes < other.bytes;
-}
-
-bool InfoSize::operator>(const InfoSize& other) const{
-    return bytes > other.bytes;
-}
-
-bool InfoSize::operator<=(const InfoSize& other) const{
-    return bytes <= other.bytes;
-}
-
-bool InfoSize::operator>=(const InfoSize& other) const{
-    return bytes >= other.bytes;
+    if(error.isEmpty())
+        return (QString::number(num, 'g', 4) + " " + unit);
+    return error;
 }

@@ -64,6 +64,8 @@ Model* FSQTableWidget::getItem(int row){
 
 void FSQTableWidget::mouseDoubleClickEvent(QMouseEvent *event){
     int row = currentRow();
+    if(row == -1)
+        return;
     QString path = ((FileSystem*)getItem(row))->getMountDir();
     QUrl url = QUrl::fromLocalFile(path);
     QDesktopServices::openUrl(url);

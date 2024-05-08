@@ -17,16 +17,17 @@ protected:
     enum columns {
         name,
         pid,
+        cpu,
         ppid,
+        virtual_memory,
+        resident_memory,
         cmd,
         state,
+        start_time,
+        priority,
     };
 public:
-    ProcQTableWidget(int rows, int columns, const QStringList& horizontalHeaders, const QStringList& verticalHeaders, QWidget *parent = nullptr)
-        : ModelQTableWidget(rows, columns, horizontalHeaders, verticalHeaders, parent){
-        setContextMenuPolicy(Qt::CustomContextMenu);
-        connect(this, &QWidget::customContextMenuRequested, this, &ProcQTableWidget::showContextMenu);
-    };
+    ProcQTableWidget(QWidget *parent = nullptr): ModelQTableWidget(parent) {};
     void addItem(Model* model) override;
     void showContextMenu(const QPoint &pos);
     void filterTable(QString str);

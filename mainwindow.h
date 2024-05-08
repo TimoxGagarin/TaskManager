@@ -15,20 +15,24 @@ class MainWindow : public QMainWindow
     Q_OBJECT
 private:
     Ui::MainWindow *ui;
-    ProcQTableWidget *processTableWidget;
     FSQTableWidget *fileSystemsTableWidget;
 
     QThread* workerThread;
+    QThread* workerPlotThread;
     Worker* worker;
+    Worker* plotWorker;
 public:
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
     void showEvent(QShowEvent *event) override;
-    void resizeEvent(QResizeEvent *event) override;
     void closeEvent(QCloseEvent *event) override;
     void timer_updateTables();
 public slots:
     void updateProcesses(QList<ProcInfo> list);
     void updateFileSystems(QList<FileSystem> list);
+private slots:
+    void on_fileSystemTableWidget_cellActivated(int row, int column);
+    void on_processTableWidget_cellActivated(int row, int column);
+    void updateCpuPlotSLO(const QVector<QVector<double>> &input);
 };
 #endif // MAINWINDOW_H

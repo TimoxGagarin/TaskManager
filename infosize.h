@@ -10,6 +10,7 @@ private:
     long long bytes;
     double num;
     QString unit;
+    QString error;
 
     QStringList units_list;
 public:
@@ -25,13 +26,8 @@ public:
     void setNum(double num) {this->num = num;};
     QString getUnit() {return unit;};
     void setUnit(QString unit) {this->unit = unit;};
-
-    bool operator==(const InfoSize& other) const;
-    bool operator!=(const InfoSize& other) const;
-    bool operator<(const InfoSize& other) const;
-    bool operator>(const InfoSize& other) const;
-    bool operator<=(const InfoSize& other) const;
-    bool operator>=(const InfoSize& other) const;
+    QString getError() {return error;};
+    void setError(QString error) {this->error = error;};
 };
 Q_DECLARE_METATYPE(InfoSize)
 #endif // INFOSIZE_H

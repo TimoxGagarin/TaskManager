@@ -14,6 +14,11 @@ void ProcQTableWidget::addItem(Model* model)
     addCol(columns::ppid, rows, procInfo->getPpid());
     addCol(columns::state, rows, procInfo->getState());
     addCol(columns::cmd, rows, procInfo->getCmd());
+    addCol(columns::virtual_memory, rows, procInfo->getVirtualMemory());
+    addCol(columns::resident_memory, rows, procInfo->getResidentMemory());
+    addCol(columns::cpu, rows, procInfo->getCPU());
+    addCol(columns::start_time, rows, procInfo->getStartTime());
+    addCol(columns::priority, rows, procInfo->getPriority());
 }
 
 Model* ProcQTableWidget::getItem(int row){
@@ -23,6 +28,11 @@ Model* ProcQTableWidget::getItem(int row){
     ret->setPpid(item(row, columns::ppid)->text().toInt());
     ret->setState(item(row, columns::state)->text());
     ret->setCmd(item(row, columns::cmd)->text());
+    ret->setVirtualMemory(InfoSize(item(row, columns::virtual_memory)->text()));
+    ret->setResidentMemory(InfoSize(item(row, columns::resident_memory)->text()));
+    ret->setCPU(item(row, columns::cpu)->text().toFloat());
+    ret->setStartTime(QDateTime::fromString(item(row, columns::start_time)->text()));
+    ret->setPriority(item(row, columns::start_time)->text().toInt());
     return (Model*) ret;
 }
 
@@ -30,12 +40,6 @@ void ProcQTableWidget::showContextMenu(const QPoint &pos){
     QPoint globalPos = mapToGlobal(pos);
     QMenu menu;
 
-    QMessageBox msgBox;
-    msgBox.setText("Hello, world!");
-    msgBox.setInformativeText("This is an informative text.");
-
-    menu.addAction("Свойства", this, [&](){ msgBox.exec();});
-    menu.addSeparator();
     menu.addAction("Остановить", this, [&](){ ((ProcInfo*)getItem(currentRow()))->stopProc(); });
     menu.addAction("Продолжить", this, [&](){((ProcInfo*)getItem(currentRow()))->continueProc();});
     menu.addAction("Завершить", this, [&](){((ProcInfo*)getItem(currentRow()))->closeProc();});

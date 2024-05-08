@@ -4,6 +4,7 @@
 #include "filesystem.h"
 #include "fsqtablewidget.h"
 #include "worker.h"
+#include "squarelegenditem.h"
 
 #include <qdebug.h>
 #include <qlist.h>
@@ -30,40 +31,28 @@ MainWindow::MainWindow(QWidget *parent)
     connect(worker, &Worker::process_updated, this, &MainWindow::updateProcesses);
     connect(worker, &Worker::fileSystems_updated, this, &MainWindow::updateFileSystems);
 
-    /// Загрузка интерфейса
-    // Страница "Процессы"
+    workerPlotThread = new QThread();
+    plotWorker = new Worker();
+    plotWorker->moveToThread(workerPlotThread);
+
+    connect(workerPlotThread, &QThread::started, plotWorker, &Worker::timer_updatePlots);
+    connect(plotWorker, &Worker::updateCpuPlotSIG, this, &MainWindow::updateCpuPlotSLO);
+
     ui->setupUi(this);
-    ui->tabWidget->setStyleSheet("QTabWidget::tab-bar {alignment: center;}");
-    QLineEdit *searchLineEdit = new QLineEdit();
-    QStringList headers = QStringList() << "Name" << "PID" << "PPID" << "CMD" << "State";
-    processTableWidget = new ProcQTableWidget(0, headers.size(), headers, {}, this);
 
-    QWidget *tableWidget = new QWidget();
-    QVBoxLayout layout(tableWidget);
-    layout.addWidget(searchLineEdit);
-    layout.addWidget(processTableWidget);
-    ui->tabWidget->insertTab(0, tableWidget, "Процессы");
-
-    connect(searchLineEdit, &QLineEdit::textChanged, [&](QString str){processTableWidget->filterTable(str);});
-
-    // Страница "Файловые системы"
-    fileSystemsTableWidget = new FSQTableWidget(0, 7, QStringList() << "Name" << "Mounted" << "Type" << "Total" << "Free" << "Available" << "Used", {}, this);
-    ui->tabWidget->insertTab(1, fileSystemsTableWidget, "Файловые системы");
+    connect(ui->searchLineEdit, &QLineEdit::textChanged, [&](QString str){ui->processTableWidget->filterTable(str);});
+    connect(ui->processTableWidget, &QTableWidget::customContextMenuRequested, ui->processTableWidget, &ProcQTableWidget::showContextMenu);
 }
 
 void MainWindow::showEvent(QShowEvent *event){
     workerThread->start();
+    workerPlotThread->start();
     QMainWindow::showEvent(event);
-}
-
-void MainWindow::resizeEvent(QResizeEvent *event){
-    QMainWindow::resizeEvent(event);
-    ui->tabWidget->setMinimumSize(this->width(), this->height());
-    processTableWidget->setMinimumSize(this->width(), this->height());
 }
 
 void MainWindow::closeEvent(QCloseEvent *event){
     worker->stop();
+    plotWorker->stop();
     QMainWindow::closeEvent(event);
 }
 
@@ -72,28 +61,52 @@ MainWindow::~MainWindow() {
 }
 
 void MainWindow::updateProcesses(QList<ProcInfo> list){
-    processTableWidget->setSortingEnabled(false);
-    processTableWidget->setUpdatesEnabled(false);
-    this->processTableWidget->clearContents();
-    this->processTableWidget->setRowCount(0);
+    ui->processTableWidget->setSortingEnabled(false);
+    ui->processTableWidget->setUpdatesEnabled(false);
+    ui->processTableWidget->clearContents();
+    ui->processTableWidget->setRowCount(0);
 
-    for(auto el: list){
-        this->processTableWidget->addItem(&el);
-    }
-    this->processTableWidget->filterTable(ui->tabWidget->widget(0)->findChild<QLineEdit*>()->text());
-    processTableWidget->setUpdatesEnabled(true);
-    processTableWidget->setSortingEnabled(true);
+    for(auto el: list)
+        ui->processTableWidget->addItem(&el);
+    ui->processTableWidget->filterTable(ui->tabWidget->widget(0)->findChild<QLineEdit*>()->text());
+    ui->processTableWidget->setUpdatesEnabled(true);
+    ui->processTableWidget->setSortingEnabled(true);
 }
 
 void MainWindow::updateFileSystems(QList<FileSystem> list){
-    fileSystemsTableWidget->setSortingEnabled(false);
-    this->fileSystemsTableWidget->setUpdatesEnabled(false);
+    ui->fileSystemTableWidget->setSortingEnabled(false);
+    ui->fileSystemTableWidget->setUpdatesEnabled(false);
 
-    this->fileSystemsTableWidget->clearContents();
-    this->fileSystemsTableWidget->setRowCount(0);
-    for(auto el: list){
-        this->fileSystemsTableWidget->addItem(&el);
-    }
-    this->fileSystemsTableWidget->setUpdatesEnabled(true);
-    fileSystemsTableWidget->setSortingEnabled(true);
+    ui->fileSystemTableWidget->clearContents();
+    ui->fileSystemTableWidget->setRowCount(0);
+    for(auto el: list)
+        ui->fileSystemTableWidget->addItem(&el);
+    ui->fileSystemTableWidget->setUpdatesEnabled(true);
+    ui->fileSystemTableWidget->setSortingEnabled(true);
 }
+
+void MainWindow::updateCpuPlotSLO(const QVector<QVector<double>> &input)
+{
+    QVector<double> x(60);
+    for (int i=59; i>0; --i)
+        x[59-i] = i;
+    const QVector<QVector<double>> *values = &input;
+    for(int i=0; i<values->count(); i++) {
+        ui->cpuGraph->graph(i)->data()->clear();
+        ui->cpuGraph->graph(i)->setData(x, values->at(i));
+        ((SquareLegendItem *)ui->cpuGraph->legend->item(i))->setVal(QString::number(values->at(i)[59], 'g', 4) + "%");
+    }
+    ui->cpuGraph->replot();
+}
+
+void MainWindow::on_processTableWidget_cellActivated(int row, int column)
+{
+
+}
+
+
+void MainWindow::on_fileSystemTableWidget_cellActivated(int row, int column)
+{
+
+}
+

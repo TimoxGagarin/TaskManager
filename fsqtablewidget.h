@@ -25,9 +25,7 @@ protected:
         used,
     };
 public:
-    FSQTableWidget(int rows, int columns, const QStringList& horizontalHeaders, const QStringList& verticalHeaders, QWidget *parent = nullptr)
-        : ModelQTableWidget(rows, columns, horizontalHeaders, verticalHeaders, parent){};
-
+    FSQTableWidget(QWidget *parent = nullptr): ModelQTableWidget(parent) {};
     void addItem(Model* model) override;
     Model* getItem(int row) override;
 

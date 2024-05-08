@@ -20,10 +20,12 @@ Worker::Worker()
 }
 
 QList<ProcInfo> Worker::get_processes() {
-    QList<ProcInfo> ret;
     QDir dir("/proc");
     dir.setFilter(QDir::Dirs | QDir::NoDotAndDotDot);
     QFileInfoList proc_list = dir.entryInfoList();
+
+    QList<QPair<ProcInfo, QPair<double, double>>> cpuTimesList;
+
     for (QFileInfo subdir: proc_list) {
         bool ok;
         pid_t pid = subdir.baseName().toInt(&ok);
@@ -59,9 +61,31 @@ QList<ProcInfo> Worker::get_processes() {
             processInfo.insert("cmd", line);
         }
         cmdfile.close();
-        // qDebug() << processInfo;
-        ret.append(ProcInfo(processInfo));
+
+        // Время запуска, приоритет
+        QString stat_path = QString("/proc/%1/stat").arg(pid);
+        QFile statfile(stat_path);
+        if (statfile.open(QIODevice::ReadOnly)) {
+            QTextStream stream(&statfile);
+            QStringList statFields = stream.readLine().split(' ');
+            processInfo.insert("start_time", statFields[21]);
+            processInfo.insert("priority", statFields[17]);
+        }
+        statfile.close();
+        ProcInfo procInfo = ProcInfo(processInfo);
+        cpuTimesList.append({procInfo, CpuUsage(procInfo.getPid()).getIdleAndWorkTimes()});
     }
+    double start_uptime = CpuUsage(0).getUptime();
+    sleep(10);
+    double end_uptime = CpuUsage(0).getUptime();
+    QList<ProcInfo> ret;
+    for (QPair<ProcInfo, QPair<double, double>> el: cpuTimesList) {
+        QPair<double, double> end = CpuUsage(el.first.getPid()).getIdleAndWorkTimes();
+        el.first.setCPU((end.first - el.second.first)/ (end_uptime - start_uptime) * 100.0f);
+        qDebug() << el.first.getCPU();
+        ret.append(el.first);
+    }
+    qDebug() << start_uptime << end_uptime;
     return ret;
 }
 
@@ -103,11 +127,107 @@ QList<FileSystem> Worker::get_fileSystems(){
     return ret;
 }
 
+QVector<Worker::cpuStruct> Worker::getCpuTimes() {
+    QVector<cpuStruct> times;
+
+    QFile file("/proc/stat");
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        qDebug() << "Could not open stat file";
+        return times;
+    }
+
+    QTextStream in(&file);
+    in.readLine();
+    while (!in.atEnd()) {
+        QString line = in.readLine();
+        QStringList fields = line.split(" ", QString::SkipEmptyParts);
+
+        if (fields.size() < 10 || !fields[0].startsWith("cpu"))
+            break;
+
+        unsigned long long user = fields[1].toULongLong();
+        unsigned long long nice = fields[2].toULongLong();
+        unsigned long long system = fields[3].toULongLong();
+        unsigned long long idle = fields[4].toULongLong();
+        unsigned long long iowait = fields[5].toULongLong();
+        unsigned long long irq = fields[6].toULongLong();
+        unsigned long long softirq = fields[7].toULongLong();
+        unsigned long long steal = fields[8].toULongLong();
+        unsigned long long guest = fields[9].toULongLong();
+        unsigned long long guestnice = fields[10].toULongLong();
+
+        cpuStruct cpu = {idle + iowait, user + nice + system + irq + softirq + steal + guest + guestnice};
+        times.append(cpu);
+    }
+
+    file.close();
+    return times;
+}
+
+QVector<double> Worker::calculateCpuPercentages(QVector<Worker::cpuStruct> now, QVector<Worker::cpuStruct> prev)
+{
+    QVector<double> times;
+    if (now.size() != prev.size())
+        return times;
+
+    for(size_t i=0; i < now.size(); i++) {
+        cpuStruct n, p;
+        n = now.at(i);
+        p = prev.at(i);
+
+        long long unsigned totald = ((n.idle + n.nonIdle) - (p.idle + p.nonIdle));
+        times.append((totald - (n.idle - p.idle)) / (double)totald * 100.0);
+    }
+    return times;
+}
+
+void Worker::updateCpu()
+{
+    QVector<cpuStruct> cpuTimes = getCpuTimes();
+    if (prevCpuTimes.size() != 0)
+    {
+        QVector<double> cpuPercentages = calculateCpuPercentages(cpuTimes, prevCpuTimes);
+        if (cpuPlotData.size() == 60)
+            cpuPlotData.pop_front();
+        cpuPlotData.push_back(cpuPercentages);
+    }
+    prevCpuTimes = cpuTimes;
+
+    QVector<QVector<double>> plottingData;
+
+    if (cpuPlotData.isEmpty())
+        return;
+
+    for (int i = 0; i < cpuPlotData.at(0).size(); i++)
+    {
+        QVector<double> headingVector;
+        headingVector.push_back(cpuPlotData.at(0).at(i));
+        plottingData.push_back(headingVector);
+    }
+
+    for (int i = 1; i < cpuPlotData.size(); i++)
+        for (int j = 0; j < cpuPlotData.at(i).size(); j++)
+            plottingData[j].append(cpuPlotData.at(i).at(j));
+
+    for (int i = 0; i < plottingData.size(); i++)
+        for (int j = 60 - plottingData.at(i).size(); j > 0; j--)
+            plottingData[i].prepend((double)0);
+
+    emit updateCpuPlotSIG(plottingData);
+}
+
 void Worker::timer_updateTables() {
     while(!stopFlag.load()){
         emit process_updated(get_processes());
         emit fileSystems_updated(get_fileSystems());
         QThread::sleep(5);
+    }
+}
+
+void Worker::timer_updatePlots() {
+    while(!stopFlag.load()){
+        updateCpu();
+        QThread::sleep(1);
     }
 }
 
