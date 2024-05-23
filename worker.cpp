@@ -6,6 +6,7 @@
 #include <qlist.h>
 #include <qstringlist.h>
 #include <qthread.h>
+#include <QRegularExpression>
 
 #include <sys/statvfs.h>
 #include <mntent.h>
@@ -19,12 +20,70 @@ Worker::Worker()
 
 }
 
+
+double getCpuUsageByPid(int pid) {
+    QString path = QString("/proc/%1/stat").arg(pid);
+
+    // Открываем файл и читаем данные о процессе
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        qWarning() << "Failed to open file" << path;
+        return -1;
+    }
+
+    QTextStream in(&file);
+    QString line = in.readLine();
+    file.close();
+
+    QStringList fields = line.split(QRegularExpression("\\s+"), Qt::SkipEmptyParts);
+    if (fields.size() < 22) {
+        qWarning() << "Invalid format in" << path;
+        return -1;
+    }
+
+    bool ok;
+    long long utime = fields[13].toLongLong(&ok);
+    if (!ok) return -1;
+    long long stime = fields[14].toLongLong(&ok);
+    if (!ok) return -1;
+    long long totalTime = utime + stime;
+    long long startTime = fields[21].toLongLong(&ok);
+    if (!ok) return -1;
+
+    // Чтение информации о времени работы системы
+    QFile uptimeFile("/proc/uptime");
+    if (!uptimeFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        qWarning() << "Failed to open /proc/uptime";
+        return -1;
+    }
+
+    QTextStream uptimeStream(&uptimeFile);
+    QString uptimeLine = uptimeStream.readLine();
+    uptimeFile.close();
+
+    QStringList uptimeFields = uptimeLine.split(QRegularExpression("\\s+"), Qt::SkipEmptyParts);
+    if (uptimeFields.isEmpty()) {
+        qWarning() << "Failed to read uptime";
+        return -1;
+    }
+
+    double uptime = uptimeFields[0].toDouble(&ok);
+    if (!ok) return -1;
+
+    long long hertz = sysconf(_SC_CLK_TCK);
+
+    double processTimeSeconds = static_cast<double>(totalTime) / hertz;
+    double systemUptimeSeconds = uptime - (static_cast<double>(startTime) / hertz);
+
+    double cpuUsage = 100.0 * (processTimeSeconds / systemUptimeSeconds);
+    return cpuUsage;
+}
+
 QList<ProcInfo> Worker::get_processes() {
     QDir dir("/proc");
     dir.setFilter(QDir::Dirs | QDir::NoDotAndDotDot);
+    QList<ProcInfo> ret;
     QFileInfoList proc_list = dir.entryInfoList();
-
-    QList<QPair<ProcInfo, QPair<double, double>>> cpuTimesList;
 
     for (QFileInfo subdir: proc_list) {
         bool ok;
@@ -73,19 +132,9 @@ QList<ProcInfo> Worker::get_processes() {
         }
         statfile.close();
         ProcInfo procInfo = ProcInfo(processInfo);
-        cpuTimesList.append({procInfo, CpuUsage(procInfo.getPid()).getIdleAndWorkTimes()});
+        procInfo.setCPU(getCpuUsageByPid(processInfo["Pid"].toInt()));
+        ret.append(procInfo);
     }
-    double start_uptime = CpuUsage(0).getUptime();
-    sleep(10);
-    double end_uptime = CpuUsage(0).getUptime();
-    QList<ProcInfo> ret;
-    for (QPair<ProcInfo, QPair<double, double>> el: cpuTimesList) {
-        QPair<double, double> end = CpuUsage(el.first.getPid()).getIdleAndWorkTimes();
-        el.first.setCPU((end.first - el.second.first)/ (end_uptime - start_uptime) * 100.0f);
-        qDebug() << el.first.getCPU();
-        ret.append(el.first);
-    }
-    qDebug() << start_uptime << end_uptime;
     return ret;
 }
 
